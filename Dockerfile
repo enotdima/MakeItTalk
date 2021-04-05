@@ -55,8 +55,8 @@ RUN conda install -y -c ffmpeg-python \
  && conda clean -ya
 
 ENV SHELL=/bin/bash
-COPY run_jupyter.sh /ds/run_jupyter.sh
-RUN chmod +x /ds/run_jupyter.sh
+COPY run_jupyter.sh /app/run_jupyter.sh
+RUN chmod +x /app/run_jupyter.sh
 
 EXPOSE 8888
 
