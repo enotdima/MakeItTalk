@@ -26,7 +26,6 @@ from scipy.signal import savgol_filter
 from src.approaches.train_audio2landmark import Audio2landmark_model
 
 default_head_name = 'Obama_close1'           # the image name (with no .jpg) to animate
-folder = 'examples/obama'            # folder with audio
 ADD_NAIVE_EYE = True                 # whether add naive eye blink
 CLOSE_INPUT_FACE_MOUTH = False       # if your image has an opened mouth, put this as True, else False
 AMP_LIP_SHAPE_X = 1.5                 # amplify the lip motion in horizontal direction
@@ -36,7 +35,7 @@ AMP_HEAD_POSE_MOTION = 0.3          # amplify the head pose motion (usually smal
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--jpg', type=str, default='{}.jpg'.format(default_head_name))
-parser.add_argument('--folder', type=str, default=folder)
+parser.add_argument('--folder', type=str)
 parser.add_argument('--close_input_face_mouth', default=CLOSE_INPUT_FACE_MOUTH, action='store_true')
 
 # Weights
@@ -81,6 +80,8 @@ parser.add_argument('--lambda_laplacian_smooth_loss', default=1.0, type=float)
 parser.add_argument('--use_11spk_only', default=False, action='store_true')
 
 opt_parser = parser.parse_args()
+
+folder = opt_parser.folder            # folder with audio
 param_name = f'_lipx_{opt_parser.amp_lip_x}_lipy_{opt_parser.amp_lip_y}_head_{opt_parser.amp_pos}'
 
 ''' STEP 1: preprocess input single image '''
