@@ -1,5 +1,8 @@
 FROM nvidia/cuda:11.0-base-ubuntu20.04
 
+ENV TZ=Europe/Moscow
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Install some basic utilities
 RUN apt-get update && apt-get install -y \
     curl \
@@ -8,6 +11,11 @@ RUN apt-get update && apt-get install -y \
     git \
     bzip2 \
     libx11-6 \
+    gcc \
+    g++ \
+    tzdata \
+    ffmpeg \
+    libgl1-mesa-glx \
  && rm -rf /var/lib/apt/lists/*
 
 # Create a working directory
@@ -32,7 +40,13 @@ RUN curl -sLo ~/miniconda.sh https://repo.continuum.io/miniconda/Miniconda3-py38
  && ~/miniconda.sh -b -p ~/miniconda \
  && rm ~/miniconda.sh \
  && conda install -y python==3.8.3 \
+ && conda config --add channels conda-forge \
  && conda clean -ya
+
+RUN pip install pysptk notebook tensorboardX ipywidgets
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install -r requirements.txt                                                                                                          
 
 # CUDA 11.0-specific steps
 RUN conda install -y -c pytorch \
@@ -41,25 +55,13 @@ RUN conda install -y -c pytorch \
     "torchvision=0.8.1=py38_cu110" \
  && conda clean -ya
 
-RUN conda install -y -c ffmpeg-python \
-  opencv-python \
-  face_alignment \
-  scikit-learn \
-  pydub \
-  pynormalize \
-  soundfile \
-  librosa \
-  pysptk \
-  pyworld \
-  resemblyzer \
- && conda clean -ya
+RUN pip install numpy==1.20.1 --upgrade
 
-ENV SHELL=/bin/bash
-COPY run_jupyter.sh /app/run_jupyter.sh
-RUN chmod +x /app/run_jupyter.sh
+COPY run_jupyter.sh app/run_jupyter.sh
+RUN sudo chmod +x app/run_jupyter.sh
 
 EXPOSE 8888
 
 
 # Set the default command to python3
-CMD ["python3", "./run_jupyter.sh"]
+CMD ["/bin/bash"]
