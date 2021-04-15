@@ -25,36 +25,52 @@ from scipy.signal import savgol_filter
 
 from src.approaches.train_audio2landmark import Audio2landmark_model
 
-default_head_name = 'dali'
-ADD_NAIVE_EYE = True
-CLOSE_INPUT_FACE_MOUTH = False
+default_head_name = 'Obama_close1'           # the image name (with no .jpg) to animate
+folder = 'examples/obama'            # folder with audio
+ADD_NAIVE_EYE = True                 # whether add naive eye blink
+CLOSE_INPUT_FACE_MOUTH = False       # if your image has an opened mouth, put this as True, else False
+AMP_LIP_SHAPE_X = 1.5                 # amplify the lip motion in horizontal direction
+AMP_LIP_SHAPE_Y = 1.5                 # amplify the lip motion in vertical direction
+AMP_HEAD_POSE_MOTION = 0.3          # amplify the head pose motion (usually smaller than 1.0, put it to 0. for a static head pose)
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--jpg', type=str, default='{}.jpg'.format(default_head_name))
+parser.add_argument('--folder', type=str, default=folder)
 parser.add_argument('--close_input_face_mouth', default=CLOSE_INPUT_FACE_MOUTH, action='store_true')
 
+# Weights
 parser.add_argument('--load_AUTOVC_name', type=str, default='examples/ckpt/ckpt_autovc.pth')
 parser.add_argument('--load_a2l_G_name', type=str, default='examples/ckpt/ckpt_speaker_branch.pth')
 parser.add_argument('--load_a2l_C_name', type=str, default='examples/ckpt/ckpt_content_branch.pth') #ckpt_audio2landmark_c.pth')
 parser.add_argument('--load_G_name', type=str, default='examples/ckpt/ckpt_116_i2i_comb.pth') #ckpt_image2image.pth') #ckpt_i2i_finetune_150.pth') #c
 
+# Lip and head motion amplification
 parser.add_argument('--amp_lip_x', type=float, default=2.)
 parser.add_argument('--amp_lip_y', type=float, default=2.)
 parser.add_argument('--amp_pos', type=float, default=.5)
+
+# Audio embeddings list for training
 parser.add_argument('--reuse_train_emb_list', type=str, nargs='+', default=[]) #  ['iWeklsXc0H8']) #['45hn7-LXDX8']) #['E_kmpT-EfOg']) #'iWeklsXc0H8', '29k8RtSUjE0', '45hn7-LXDX8',
+
+# Image_translation training arguments
 parser.add_argument('--add_audio_in', default=False, action='store_true')
 parser.add_argument('--comb_fan_awing', default=False, action='store_true')
 parser.add_argument('--output_folder', type=str, default='examples')
 
+
 parser.add_argument('--test_end2end', default=True, action='store_true')
 parser.add_argument('--dump_dir', type=str, default='', help='')
 parser.add_argument('--pos_dim', default=7, type=int)
+
+# Audio2Landmark model parameters
 parser.add_argument('--use_prior_net', default=True, action='store_true')
 parser.add_argument('--transformer_d_model', default=32, type=int)
 parser.add_argument('--transformer_N', default=2, type=int)
 parser.add_argument('--transformer_heads', default=2, type=int)
 parser.add_argument('--spk_emb_enc_size', default=16, type=int)
+
+# Training parameters
 parser.add_argument('--init_content_encoder', type=str, default='')
 parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
 parser.add_argument('--reg_lr', type=float, default=1e-6, help='weight decay')
@@ -65,9 +81,11 @@ parser.add_argument('--lambda_laplacian_smooth_loss', default=1.0, type=float)
 parser.add_argument('--use_11spk_only', default=False, action='store_true')
 
 opt_parser = parser.parse_args()
+param_name = f'_lipx_{opt_parser.amp_lip_x}_lipy_{opt_parser.amp_lip_y}_head_{opt_parser.amp_pos}'
 
 ''' STEP 1: preprocess input single image '''
-img =cv2.imread('examples/' + opt_parser.jpg)
+#img = cv2.imread('examples/' + opt_parser.jpg)
+img = cv2.resize(cv2.imread('examples/' + opt_parser.jpg), (256, 256))
 predictor = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, device='cuda', flip_input=True)
 shapes = predictor.get_landmarks(img)
 if (not shapes or len(shapes) != 1):
@@ -81,10 +99,10 @@ if(opt_parser.close_input_face_mouth):
 
 ''' Additional manual adjustment to input face landmarks (slimmer lips and wider eyes) '''
 # shape_3d[48:, 0] = (shape_3d[48:, 0] - np.mean(shape_3d[48:, 0])) * 0.95 + np.mean(shape_3d[48:, 0])
-shape_3d[49:54, 1] += 1.
-shape_3d[55:60, 1] -= 1.
-shape_3d[[37,38,43,44], 1] -=2
-shape_3d[[40,41,46,47], 1] +=2
+#shape_3d[49:54, 1] += 1.
+#shape_3d[55:60, 1] -= 1.
+#shape_3d[[37,38,43,44], 1] -=2
+#shape_3d[[40,41,46,47], 1] +=2
 
 
 ''' STEP 2: normalize face as input to audio branch '''
@@ -95,26 +113,29 @@ shape_3d, scale, shift = util.norm_input_face(shape_3d)
 # audio real data
 au_data = []
 au_emb = []
-ains = glob.glob1('examples', '*.wav')
-ains = [item for item in ains if item is not 'tmp.wav']
+ains = glob.glob(f'{folder}/*.wav')
+# ains = glob.glob1(folder, '*.wav')
+print(ains)
+ains = [item for item in ains if item != "tmp.wav"]
 ains.sort()
+print(ains)
 for ain in ains:
-    os.system('ffmpeg -y -loglevel error -i examples/{} -ar 16000 examples/tmp.wav'.format(ain))
-    shutil.copyfile('examples/tmp.wav', 'examples/{}'.format(ain))
+    os.system(f'ffmpeg -y -loglevel error -i {ain} -ar 16000 {folder}/tmp.wav')
+    shutil.copyfile(f'{folder}/tmp.wav', f'{ain}')
 
     # au embedding
     from thirdparty.resemblyer_util.speaker_emb import get_spk_emb
-    me, ae = get_spk_emb('examples/{}'.format(ain))
+    me, ae = get_spk_emb('{}'.format(ain))
     au_emb.append(me.reshape(-1))
 
     print('Processing audio file', ain)
     c = AutoVC_mel_Convertor('examples')
 
-    au_data_i = c.convert_single_wav_to_autovc_input(audio_filename=os.path.join('examples', ain),
+    au_data_i = c.convert_single_wav_to_autovc_input(audio_filename=ain,
            autovc_model_path=opt_parser.load_AUTOVC_name)
     au_data += au_data_i
-if(os.path.isfile('examples/tmp.wav')):
-    os.remove('examples/tmp.wav')
+if(os.path.isfile(f'{folder}/tmp.wav')):
+    os.remove(f'{folder}/tmp.wav')
 
 # landmark fake placeholder
 fl_data = []
@@ -143,7 +164,6 @@ with open(os.path.join('examples', 'dump', 'random_val_au.pickle'), 'wb') as fp:
 with open(os.path.join('examples', 'dump', 'random_val_gaze.pickle'), 'wb') as fp:
     gaze = {'rot_trans':rot_tran, 'rot_quat':rot_quat, 'anchor_t_shape':anchor_t_shape}
     pickle.dump(gaze, fp)
-
 
 ''' STEP 4: RUN audio->landmark network'''
 model = Audio2landmark_model(opt_parser, jpg_shape=shape_3d)
@@ -174,6 +194,10 @@ for i in range(0,len(fls)):
     ''' STEP 6: Imag2image translation '''
     model = Image_translation_block(opt_parser, single_test=True)
     with torch.no_grad():
-        model.single_test(jpg=img, fls=fl, filename=fls[i], prefix=opt_parser.jpg.split('.')[0])
+        model.single_test(
+            jpg=img, fls=fl,
+            filename=fls[i],
+            prefix=opt_parser.jpg.split('.')[0]+param_name
+                          )
         print('finish image2image gen')
     os.remove(os.path.join('examples', fls[i]))
