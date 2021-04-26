@@ -383,21 +383,21 @@ class Image_translation_block():
             fls[:, 0::3] += 130
             fls[:, 1::3] += 80
 
-        writer = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc(*'mjpg'), 62.5, (256 * 3, 256))
+        writer = cv2.VideoWriter('out.mp4', cv2.VideoWriter_fourcc(*'mjpg'), 62.5, (512, 512))
 
         for i, frame in enumerate(fls):
 
-            img_fl = np.ones(shape=(256, 256, 3)) * 255
+            img_fl = np.ones(shape=(512, 512, 3)) * 255
             fl = frame.astype(int)
             img_fl = vis_landmark_on_img(img_fl, np.reshape(fl, (68, 3)))
             frame = np.concatenate((img_fl, jpg), axis=2).astype(np.float32)/255.0
 
-            image_in, image_out = frame.transpose((2, 0, 1)), np.zeros(shape=(3, 256, 256))
+            image_in, image_out = frame.transpose((2, 0, 1)), np.zeros(shape=(3, 512, 512))
             # image_in, image_out = frame.transpose((2, 1, 0)), np.zeros(shape=(3, 256, 256))
             image_in, image_out = torch.tensor(image_in, requires_grad=False), \
                                   torch.tensor(image_out, requires_grad=False)
 
-            image_in, image_out = image_in.reshape(-1, 6, 256, 256), image_out.reshape(-1, 3, 256, 256)
+            image_in, image_out = image_in.reshape(-1, 6, 512, 512), image_out.reshape(-1, 3, 512, 512)
             image_in, image_out = image_in.to(device), image_out.to(device)
 
             g_out = self.G(image_in)
@@ -416,10 +416,11 @@ class Image_translation_block():
                 g_out_grey =np.mean(g_out, axis=3, keepdims=True)
                 g_out[:, :, :, 0:1] = g_out[:, :, :, 1:2] = g_out[:, :, :, 2:3] = g_out_grey
 
-
+            g_out *= 255
             for i in range(g_out.shape[0]):
-                frame = np.concatenate((ref_in[i], g_out[i], fls_in[i]), axis=1) * 255.0
-                writer.write(frame.astype(np.uint8))
+                #frame = np.concatenate((ref_in[i], g_out[i], fls_in[i]), axis=1) * 255.0
+                #frame = np.concatenate((ref_in[i], g_out[i], fls_in[i]), axis=1) * 255.0
+                writer.write(g_out[i].astype(np.uint8))
 
         writer.release()
         print('Time - only video:', time.time() - st)

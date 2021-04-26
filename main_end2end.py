@@ -82,11 +82,11 @@ parser.add_argument('--use_11spk_only', default=False, action='store_true')
 opt_parser = parser.parse_args()
 
 folder = opt_parser.folder            # folder with audio
-param_name = f'_lipx_{opt_parser.amp_lip_x}_lipy_{opt_parser.amp_lip_y}_head_{opt_parser.amp_pos}'
+param_name = f'_lipx_{opt_parser.amp_lip_x}_lipy_{opt_parser.amp_lip_y}_head_{opt_parser.amp_pos}_manual'
 
 ''' STEP 1: preprocess input single image '''
 #img = cv2.imread('examples/' + opt_parser.jpg)
-img = cv2.resize(cv2.imread('examples/' + opt_parser.jpg), (256, 256))
+img = cv2.resize(cv2.imread('examples/' + opt_parser.jpg), (512, 512))
 predictor = face_alignment.FaceAlignment(face_alignment.LandmarksType._3D, device='cuda', flip_input=True)
 shapes = predictor.get_landmarks(img)
 if (not shapes or len(shapes) != 1):
@@ -99,11 +99,11 @@ if(opt_parser.close_input_face_mouth):
 
 
 ''' Additional manual adjustment to input face landmarks (slimmer lips and wider eyes) '''
-# shape_3d[48:, 0] = (shape_3d[48:, 0] - np.mean(shape_3d[48:, 0])) * 0.95 + np.mean(shape_3d[48:, 0])
-#shape_3d[49:54, 1] += 1.
-#shape_3d[55:60, 1] -= 1.
-#shape_3d[[37,38,43,44], 1] -=2
-#shape_3d[[40,41,46,47], 1] +=2
+shape_3d[48:, 0] = (shape_3d[48:, 0] - np.mean(shape_3d[48:, 0])) * 0.95 + np.mean(shape_3d[48:, 0])
+shape_3d[49:54, 1] += 1.
+shape_3d[55:60, 1] -= 1.
+shape_3d[[37,38,43,44], 1] -=2
+shape_3d[[40,41,46,47], 1] +=2
 
 
 ''' STEP 2: normalize face as input to audio branch '''

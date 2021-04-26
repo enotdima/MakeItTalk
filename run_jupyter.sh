@@ -1,3 +1,3 @@
 #! /bin/bash
 
-jupyter notebook --no-browser --allow-root --port=7745 --NotebookApp.token='tutorial'
+jupyter notebook --no-browser --allow-root --port=8888 --NotebookApp.token='tutorial'
